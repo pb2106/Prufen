@@ -267,7 +267,7 @@ TODO: Fill from `snarkjs r1cs info`
 | Nullifier lookup (indexed) | TODO |
 | Circuit constraint count | TODO |
 ---
-## Comparison Table| System | Proof Gen Mobile | Proof Size | Verif Time | Unlinkable | Device Bound |
+Comparison Table| System | Proof Gen Mobile | Proof Size | Verif Time | Unlinkable | Device Bound |
 |---|---|---|---|---|---|
 | Prüfen (ours) | TODO | TODO | TODO | Yes | Yes |
 | Polygon ID | ~2000-4000ms | ~800B | ~5ms | No | No |
