@@ -3,10 +3,8 @@
 **Prove facts, not data.**
 *A zero-knowledge attribute verification protocol with verifier binding, cross-verifier
 unlinkability, and practical mobile performance.*
-![Language](https://img.shields.io/badge/Language
-Python%20%2F%20JavaScript%20%2F%20Kotlin-blue)
-![ZK Backend](https://img.shields.io/badge/ZK_Backend-Circom_2.x_%2B_Groth16
-green)
+![Language](https://img.shields.io/badge/LanguagePython%20%2F%20JavaScript%20%2F%20Kotlin-blue)
+![ZK Backend](https://img.shields.io/badge/ZK_Backend-Circom_2.x_%2B_Groth16green)
 ![Curve](https://img.shields.io/badge/Curve-BN254_(128--bit_security)-orange)
 ![License](https://img.shields.io/badge/License-MIT-lightgrey)
 ![Status](https://img.shields.io/badge/Status-Research_Prototype-red)
