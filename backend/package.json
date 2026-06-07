@@ -1,0 +1,8 @@
+{
+  "name": "prufen-backend-zk",
+  "version": "1.0.0",
+  "description": "ZK proof verification helper",
+  "dependencies": {
+    "snarkjs": "^0.7.2"
+  }
+}

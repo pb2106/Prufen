@@ -2,7 +2,7 @@
 Prüfen - Privacy-Preserving Attribute Verification Platform
 FastAPI Backend
 """
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, Header, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import PlainTextResponse
 import models
@@ -56,6 +56,61 @@ async def root():
 async def health_check():
     """Health check endpoint."""
     return {"status": "healthy"}
+
+
+@app.post("/api/webhooks/proof-received")
+async def mock_verifier_webhook(
+    request: Request,
+    x_prufen_signature: str = Header(None),
+    x_prufen_timestamp: str = Header(None)
+):
+    """
+    MOCK VERIFIER WEBHOOK HANDLER
+    Simulates a 3rd party server receiving the webhook.
+    Verifies the RSA signature and checks the timestamp to prevent replay attacks.
+    """
+    import base64
+    from cryptography.hazmat.primitives import hashes
+    from cryptography.hazmat.primitives.asymmetric import padding
+    from cryptography.exceptions import InvalidSignature
+    from datetime import datetime
+    import crypto_utils
+    
+    if not x_prufen_signature or not x_prufen_timestamp:
+        raise HTTPException(status_code=400, detail="Missing signature headers")
+        
+    # Check timestamp (must be within 30 seconds)
+    try:
+        ts = int(x_prufen_timestamp)
+        now = int(datetime.utcnow().timestamp())
+        if abs(now - ts) > 30:
+            raise HTTPException(status_code=400, detail="Webhook timestamp expired (replay protection)")
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid timestamp format")
+        
+    # Verify signature
+    body = await request.body()
+    message = f"{x_prufen_timestamp}.{body.decode()}".encode()
+    
+    try:
+        public_key = crypto_utils.load_public_key()
+        signature_bytes = base64.b64decode(x_prufen_signature)
+        public_key.verify(
+            signature_bytes,
+            message,
+            padding.PKCS1v15(),
+            hashes.SHA256()
+        )
+    except InvalidSignature:
+        print("MOCK VERIFIER: Signature verification FAILED!")
+        raise HTTPException(status_code=400, detail="Invalid webhook signature")
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Signature verification error: {str(e)}")
+        
+    print("MOCK VERIFIER: Webhook signature verified successfully!")
+    print(f"MOCK VERIFIER: Payload: {body.decode()}")
+    
+    return {"status": "received_and_verified"}
 
 
 @app.get("/.well-known/jwks.json")

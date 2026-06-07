@@ -1,0 +1,8 @@
+{
+  "name": "prufen-circuits",
+  "version": "1.0.0",
+  "description": "ZK circuits for Prufen age verification",
+  "dependencies": {
+    "circomlib": "^2.0.5"
+  }
+}

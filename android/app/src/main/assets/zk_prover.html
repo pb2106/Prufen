@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>ZK Prover Bridge</title>
+    <!-- Load snarkjs from a local asset or CDN. In a real app this is bundled. -->
+    <script src="https://cdn.jsdelivr.net/npm/snarkjs@0.7.2/build/snarkjs.min.js"></script>
+</head>
+<body>
+    <script>
+        async function generateProof(jsonInputStr) {
+            try {
+                const input = JSON.parse(jsonInputStr);
+                
+                // Perform proof generation using local assets
+                const { proof, publicSignals } = await window.snarkjs.groth16.fullProve(
+                    input,
+                    "age_verify.wasm",
+                    "age_verify_final.zkey"
+                );
+
+                const result = {
+                    proof: proof,
+                    publicSignals: publicSignals
+                };
+
+                // Send back to Android
+                if (window.AndroidJS) {
+                    window.AndroidJS.onProofGenerated(JSON.stringify(result));
+                }
+            } catch (err) {
+                if (window.AndroidJS) {
+                    window.AndroidJS.onError(err.toString());
+                }
+            }
+        }
+    </script>
+</body>
+</html>

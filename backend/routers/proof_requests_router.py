@@ -43,7 +43,9 @@ class ProofRequestResponse(BaseModel):
 
 
 class ApproveProofRequestRequest(BaseModel):
-    user_id: str
+    proof: dict
+    public_signals: list
+    nullifier_hash: str
 
 
 @router.post("/", response_model=ProofRequestResponse)
@@ -211,14 +213,6 @@ async def approve_proof_request(
             detail="Proof request expired"
         )
     
-    # Fetch user data
-    user = db.query(models.MockUser).filter_by(user_id=request.user_id).first()
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found"
-        )
-    
     # Get verifier
     verifier = db.query(models.Verifier).filter_by(
         verifier_id=proof_request.verifier_id
@@ -230,28 +224,24 @@ async def approve_proof_request(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Verifier configuration missing. Please run seed_data.py."
         )
-    
+
     try:
         # ============================================
-        # CRITICAL: Compute condition IN MEMORY ONLY
-        # Raw DOB is NEVER stored in the proof
+        # CRITICAL: Verify ZK Proof via Node.js
+        # Raw DOB is NEVER received by the backend
         # ============================================
-        age = (date.today() - user.dob).days // 365
+        import zk_verifier
         
-        if proof_request.claim_type == "age_over_18":
-            result = age >= 18
-        elif proof_request.claim_type == "age_over_21":
-            result = age >= 21
-        elif proof_request.claim_type == "student_status":
-            # Jane (teen) is a student, John (adult) is not
-            result = user.user_id == "usr_demo_teen"
-        elif proof_request.claim_type == "residency_US":
-            # John (adult) is US resident, Jane (teen) is not
-            result = user.user_id == "usr_demo_adult"
-        else:
-            result = False  # Unknown claim type
-        
-        # DOB is now discarded - only YES/NO result continues
+        # 1. Check Nullifier to prevent replay attacks
+        if db.query(models.NullifierRegistry).filter_by(nullifier_hash=request.nullifier_hash).first():
+            raise HTTPException(status_code=400, detail="Proof has already been used (nullifier spent).")
+            
+        # 2. Verify Groth16 Proof
+        is_valid = zk_verifier.verify_groth16_proof(request.public_signals, request.proof)
+        if not is_valid:
+            raise HTTPException(status_code=400, detail="Invalid Zero-Knowledge Proof.")
+            
+        result = True  # If the proof is valid, the condition (e.g. age) is met
         
         # Generate verifier binding
         salt = crypto_utils.generate_salt()
@@ -287,7 +277,7 @@ async def approve_proof_request(
         # Store proof
         proof = models.Proof(
             proof_id=proof_id,
-            user_id=request.user_id,
+            user_id="zk-anonymous-user",  # User ID is now hidden from the backend
             claim_type=proof_request.claim_type,
             result=result,
             verifier_hash=verifier_hash,
@@ -316,25 +306,54 @@ async def approve_proof_request(
         
         db.add(audit)
         
-        # Store nonce to prevent replay
+        # Store nullifier to prevent replay
+        nullifier_entry = models.NullifierRegistry(
+            nullifier_hash=request.nullifier_hash,
+            proof_id=proof_id
+        )
+        db.add(nullifier_entry)
+        
+        # Store nonce to prevent replay (legacy if needed, or remove)
         used_nonce = models.UsedNonce(
             nonce=nonce,
             expires_at=datetime.utcnow() + timedelta(seconds=300)
         )
-        
         db.add(used_nonce)
         db.commit()
         
         # Send webhook notification if provided
         if proof_request.callback_url:
             try:
+                import base64
+                from cryptography.hazmat.primitives import hashes
+                from cryptography.hazmat.primitives.asymmetric import padding
+                
+                payload = {
+                    "proof_request_id": request_id,
+                    "status": "approved",
+                    "proof_url": f"http://localhost:8000/api/proofs/{proof_id}"
+                }
+                payload_str = json.dumps(payload, separators=(',', ':'))
+                timestamp = str(int(datetime.utcnow().timestamp()))
+                
+                message = f"{timestamp}.{payload_str}".encode()
+                
+                private_key = crypto_utils.load_private_key()
+                signature = private_key.sign(
+                    message,
+                    padding.PKCS1v15(),
+                    hashes.SHA256()
+                )
+                signature_b64 = base64.b64encode(signature).decode()
+                
                 async with httpx.AsyncClient(timeout=5.0) as client:
                     await client.post(
                         proof_request.callback_url,
-                        json={
-                            "proof_request_id": request_id,
-                            "status": "approved",
-                            "proof_url": f"http://localhost:8000/api/proofs/{proof_id}"
+                        content=payload_str,
+                        headers={
+                            "Content-Type": "application/json",
+                            "X-Prufen-Signature": signature_b64,
+                            "X-Prufen-Timestamp": timestamp
                         }
                     )
             except Exception as e:
@@ -383,12 +402,38 @@ async def reject_proof_request(
     # Send webhook notification if provided
     if proof_request.callback_url:
         try:
+            import json
+            import base64
+            from cryptography.hazmat.primitives import hashes
+            from cryptography.hazmat.primitives.asymmetric import padding
+            import crypto_utils
+            from datetime import datetime
+            
+            payload = {
+                "proof_request_id": request_id,
+                "status": "rejected"
+            }
+            payload_str = json.dumps(payload, separators=(',', ':'))
+            timestamp = str(int(datetime.utcnow().timestamp()))
+            
+            message = f"{timestamp}.{payload_str}".encode()
+            
+            private_key = crypto_utils.load_private_key()
+            signature = private_key.sign(
+                message,
+                padding.PKCS1v15(),
+                hashes.SHA256()
+            )
+            signature_b64 = base64.b64encode(signature).decode()
+            
             async with httpx.AsyncClient(timeout=5.0) as client:
                 await client.post(
                     proof_request.callback_url,
-                    json={
-                        "proof_request_id": request_id,
-                        "status": "rejected"
+                    content=payload_str,
+                    headers={
+                        "Content-Type": "application/json",
+                        "X-Prufen-Signature": signature_b64,
+                        "X-Prufen-Timestamp": timestamp
                     }
                 )
         except Exception as e:

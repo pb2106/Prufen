@@ -1,0 +1,9 @@
+{
+  "name": "prufen-benchmarks",
+  "version": "1.0.0",
+  "description": "Benchmarking scripts for Prufen research paper",
+  "dependencies": {
+    "snarkjs": "^0.7.2",
+    "circomlibjs": "^0.1.2"
+  }
+}

@@ -81,3 +81,13 @@ class UsedNonce(Base):
     nonce = Column(String(64), primary_key=True)
     used_at = Column(DateTime(timezone=True), server_default=func.now())
     expires_at = Column(DateTime(timezone=True), nullable=False)
+
+
+class NullifierRegistry(Base):
+    """Tracks spent nullifiers to prevent replay attacks."""
+    __tablename__ = "nullifier_registry"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    nullifier_hash = Column(String(100), unique=True, index=True, nullable=False)
+    proof_id = Column(String(50), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())

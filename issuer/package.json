@@ -1,0 +1,8 @@
+{
+  "name": "prufen-issuer-signer",
+  "version": "1.0.0",
+  "description": "BabyJubJub signing scripts for Prufen issuer via circomlibjs",
+  "dependencies": {
+    "circomlibjs": "^0.1.7"
+  }
+}

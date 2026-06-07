@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { ShieldCheck, CheckCircle2, XCircle, Clock, Trash2, Lock, AlertCircle, ArrowLeft } from 'lucide-react';
 import api from '../../services/api';
+import { buildPoseidon } from 'circomlibjs';
 
 export default function Consent() {
     const { request_id } = useParams();
@@ -56,8 +57,87 @@ export default function Consent() {
         setError(null);
 
         try {
+            // --- 1. LOCAL CREDENTIAL ISSUANCE (If not already present) ---
+            // In a real app, the user would already have this in their wallet.
+            // For the demo, we generate it on the fly but store it locally.
+            let credential = JSON.parse(localStorage.getItem(`credential_${currentUser.id}`) || 'null');
+            let birthDate = JSON.parse(localStorage.getItem(`birthdate_${currentUser.id}`) || 'null');
+
+            if (!credential) {
+                // Mock user data
+                const birthYear = currentUser.id === 'usr_demo_adult' ? 1990 : 2010;
+                const birthMonth = 1;
+                const birthDay = 1;
+                const salt = Math.floor(Math.random() * 1000000000);
+
+                birthDate = { birthYear, birthMonth, birthDay, salt };
+                localStorage.setItem(`birthdate_${currentUser.id}`, JSON.stringify(birthDate));
+
+                // Compute Poseidon commitment locally
+                const poseidon = await buildPoseidon();
+                const F = poseidon.F;
+                const hash = poseidon([birthYear, birthMonth, birthDay, salt]);
+                const commitment = F.toString(hash);
+
+                // Get signed credential from Issuer (Port 8001)
+                const issuerRes = await fetch('http://localhost:8001/issue-credential', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-API-Key': 'issuer-dev-key-change-in-production' // From issuer/.env.example
+                    },
+                    body: JSON.stringify({
+                        commitment: commitment,
+                        user_id: currentUser.id
+                    })
+                });
+
+                if (!issuerRes.ok) {
+                    throw new Error('Failed to obtain credential from Issuer');
+                }
+
+                credential = await issuerRes.json();
+                localStorage.setItem(`credential_${currentUser.id}`, JSON.stringify(credential));
+            }
+
+            // --- 2. LOCAL ZK PROOF GENERATION ---
+            const today = new Date();
+            const currentYear = today.getFullYear();
+            const currentMonth = today.getMonth() + 1;
+            const currentDay = today.getDate();
+
+            let minAge = 0;
+            if (request.claim_type === 'age_over_18') minAge = 18;
+            else if (request.claim_type === 'age_over_21') minAge = 21;
+
+            const input = {
+                birthYear: birthDate.birthYear,
+                birthMonth: birthDate.birthMonth,
+                birthDay: birthDate.birthDay,
+                salt: birthDate.salt,
+                currentYear,
+                currentMonth,
+                currentDay,
+                minAge,
+                commitment: credential.commitment
+            };
+
+            // Generate proof using window.snarkjs (loaded via script tag in index.html)
+            const { proof, publicSignals } = await window.snarkjs.groth16.fullProve(
+                input,
+                "/zk/age_verify.wasm",
+                "/zk/age_verify_final.zkey"
+            );
+
+            // Generate a random nullifier to prevent replay attacks
+            const nullifier_hash = Array.from(crypto.getRandomValues(new Uint8Array(16)))
+                .map(b => b.toString(16).padStart(2, '0')).join('');
+
+            // --- 3. SEND ZK PROOF TO BACKEND (DOB is NOT sent) ---
             const res = await api.post(`/proof-requests/${request_id}/approve`, {
-                user_id: currentUser.id
+                proof: proof,
+                public_signals: publicSignals,
+                nullifier_hash: nullifier_hash
             });
 
             if (request.callback_url) {

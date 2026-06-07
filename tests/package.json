@@ -1,0 +1,9 @@
+{
+  "name": "prufen-tests",
+  "version": "1.0.0",
+  "description": "Test runner for ZK circuit tests",
+  "dependencies": {
+    "snarkjs": "^0.7.2",
+    "circomlibjs": "^0.1.2"
+  }
+}
