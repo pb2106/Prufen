@@ -11,7 +11,8 @@ from routers import (
     auth_router,
     proof_requests_router,
     proofs_router,
-    admin_router
+    admin_router,
+    issuer_router
 )
 
 # Create database tables
@@ -38,6 +39,7 @@ app.include_router(auth_router.router)
 app.include_router(proof_requests_router.router)
 app.include_router(proofs_router.router)
 app.include_router(admin_router.router)
+app.include_router(issuer_router.router)
 
 
 @app.get("/")

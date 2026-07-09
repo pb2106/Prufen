@@ -91,3 +91,26 @@ class NullifierRegistry(Base):
     nullifier_hash = Column(String(100), unique=True, index=True, nullable=False)
     proof_id = Column(String(50), nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+from pydantic import BaseModel, Field
+from typing import Optional
+
+class IssueCredentialRequest(BaseModel):
+    commitment: str = Field(
+        ...,
+        description="Poseidon(birthYear, birthMonth, birthDay, salt) expressed as a decimal string."
+    )
+    user_id: str = Field(
+        ...,
+        description="Opaque user identifier"
+    )
+
+class SignedCredential(BaseModel):
+    commitment: str = Field(..., description="The commitment that was signed.")
+    R8x: str        = Field(..., description="EdDSA signature R8 x-coordinate.")
+    R8y: str        = Field(..., description="EdDSA signature R8 y-coordinate.")
+    S: str          = Field(..., description="EdDSA signature scalar S.")
+    Ax: str         = Field(..., description="Issuer BabyJubJub public key x.")
+    Ay: str         = Field(..., description="Issuer BabyJubJub public key y.")
+    issued_at: str  = Field(..., description="ISO 8601 UTC timestamp.")
+    issuer: str     = Field("prufen-issuer-v1", description="Issuer identifier.")

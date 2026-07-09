@@ -79,24 +79,17 @@ export default function Consent() {
                 const hash = poseidon([birthYear, birthMonth, birthDay, salt]);
                 const commitment = F.toString(hash);
 
-                // Get signed credential from Issuer (Port 8001)
-                const issuerRes = await fetch('http://localhost:8001/issue-credential', {
-                    method: 'POST',
+                // Get signed credential from Issuer
+                const issuerRes = await api.post('/issue-credential', {
+                    commitment: commitment,
+                    user_id: currentUser.id
+                }, {
                     headers: {
-                        'Content-Type': 'application/json',
                         'X-API-Key': 'issuer-dev-key-change-in-production' // From issuer/.env.example
-                    },
-                    body: JSON.stringify({
-                        commitment: commitment,
-                        user_id: currentUser.id
-                    })
+                    }
                 });
 
-                if (!issuerRes.ok) {
-                    throw new Error('Failed to obtain credential from Issuer');
-                }
-
-                credential = await issuerRes.json();
+                credential = issuerRes.data;
                 localStorage.setItem(`credential_${currentUser.id}`, JSON.stringify(credential));
             }
 
