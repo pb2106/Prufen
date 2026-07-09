@@ -1,0 +1,7 @@
+{
+  "name": "prufen-signer",
+  "version": "1.0.0",
+  "dependencies": {
+    "circomlibjs": "^0.1.7"
+  }
+}

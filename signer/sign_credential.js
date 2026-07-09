@@ -1,5 +1,13 @@
 /**
  * sign_credential.js — Sign a Poseidon commitment with BabyJubJub EdDSA.
+ *
+ * Called by Python via subprocess:
+ *   node sign_credential.js <privkey_hex> <commitment_decimal_string>
+ *
+ * Outputs JSON to stdout:
+ *   { R8x, R8y, S, Ax, Ay }  — all decimal strings, ready for circom inputs.
+ *
+ * The issuer NEVER receives the raw birth date — only the Poseidon commitment.
  */
 const { buildEddsa, buildBabyjub } = require("circomlibjs");
 
