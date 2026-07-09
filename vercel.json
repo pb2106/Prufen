@@ -5,7 +5,7 @@
       "framework": "vite",
       "routes": [
         {
-          "src": "/(.*)",
+          "src": "^/(?!api|assets|.*\\.[a-zA-Z0-9]+$).*",
           "dest": "/index.html"
         }
       ]
